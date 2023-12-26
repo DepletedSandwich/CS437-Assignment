@@ -10,6 +10,9 @@ unicode-tr = "*"
 flask-cors = "*"
 flask-sqlalchemy = "*"
 flask-login = "*"
+requests = "*"
+python-dateutil = "*"
+datetime = "*"
 
 [dev-packages]
 

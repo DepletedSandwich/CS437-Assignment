@@ -3,6 +3,7 @@ from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user
 import os
+import requests
 
 app = Flask(__name__)
 app.secret_key = os.urandom(24)
@@ -49,9 +50,10 @@ def register_member():
 	return render_template('news_index_register.html')
     
 @app.route('/news_feed', methods = ['GET'])
-@login_required
+#@login_required
 def feed_load():
-	return render_template('prod_table.html')
+	feed_response = requests.get('http://127.0.0.1:5000/getallnews')
+	return render_template('prod_table.html',table_fill = feed_response.json())
 #### Static html pages hosted ####
 
 #### Login and Session Management APIs ####
