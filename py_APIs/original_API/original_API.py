@@ -98,11 +98,11 @@ def register_member_post():
 	existing_email = User.query.filter_by(email=email).first()
 
 	if existing_user:
-		warning_message = 'Username already exists.'
+		warning_message = 'Username not valid!'
 		return render_template('news_index_register.html', warning_message=warning_message)
 
 	if existing_email:
-		warning_message = 'Email address already in use.'
+		warning_message = 'Email not valid!'
 		return render_template('news_index_register.html', warning_message=warning_message)
 
 	# Create a new User instance and add it to the database

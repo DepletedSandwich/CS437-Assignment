@@ -52,26 +52,24 @@
     </style>
 </head>
 <body>
-    <nav class="navbar navbar-expand-lg navbar-dark">
-        <div class="container">
-            <a class="navbar-brand" href="#">Daily Turkish News</a>
-            <form class="form-inline my-2 my-lg-0">
-                <input class="form-control mr-sm-2" type="search" placeholder="Search for news..." aria-label="Search">
-                <button class="btn btn-outline-light my-2 my-sm-0" type="submit">Search</button>
-            </form>
-        </div>
-    </nav>
+<nav class="navbar navbar-expand-lg navbar-dark">
+    <div class="container">
+        <a class="navbar-brand" href="#">Turkish Daily News</a>
+        <form class="form-inline my-2 my-lg-0 ml-auto" id="searchForm">
+            <input class="form-control mr-sm-2" type="search" placeholder="Search" aria-label="Search" id="searchInput">
+            <button class="btn btn-outline-light my-2 my-sm-0" type="submit">Search</button>
+        </form>
+    </div>
+</nav>
 
 <div class="container">
     <div class="row">
         <div class="col-md-12">
             <!-- Main News Section -->
-            <h2>Main News Report</h2>
             {% for feed_item in table_fill%}
             <div class="card">
                 <div class="card-body">
                     <h5 class="card-title">{{feed_item.title}}</h5>
-                    
                     <span class="badge bg-secondary agency-badge">{{feed_item.agency}}</span>
                     <p class="card-text"><small class="text-muted">Published On: {{feed_item.publish_date}}</small></p>
                 </div>
@@ -80,6 +78,24 @@
         </div>
     </div>
 </div>
+<script>
+    document.getElementById("searchForm").addEventListener("submit", function (e) {
+        e.preventDefault();
+        const searchInput = document.getElementById("searchInput").value.toLowerCase(); 
+        const cardTitles = document.querySelectorAll(".card-title");
+
+        cardTitles.forEach(function (title) {
+            const cardTitle = title.textContent.toLowerCase();
+            const card = title.closest(".card");
+
+            if (cardTitle.includes(searchInput)) {
+                card.style.display = "block";
+            } else {
+                card.style.display = "none";
+            }
+        });
+    });
+</script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-ka7Sk0Gln4gmtz2MlQnikT1wXgYsOg+OMhuP+IlRH9sENBO0LRn5q+8nbTov4+1p" crossorigin="anonymous"></script>
 </body>
 </html>
