@@ -1,9 +1,11 @@
 from flask import Flask, jsonify, request, redirect, url_for, session, render_template
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
-from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user
+from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 import os
 import requests
+import json
+import subprocess
 
 app = Flask(__name__)
 app.secret_key = os.urandom(24)
@@ -32,36 +34,140 @@ class Admin(UserMixin, db.Model):
 @app.route('/welcome', methods = ['GET'])
 def welcome():
 	db.create_all()
-	success_message = session.get('registration_success')
+	
+	reg_success_msg = session.get('registration_success') #Session Variable holding register success
 	session.pop('registration_success', None)
 	
-	return render_template('welcome.html', confirmation_message=success_message)
+	out_success_msg = session.get('logout_success') #Session Variable holding logout success
+	session.pop('logout_success', None)
 	
-@app.route('/admin_login', methods = ['GET'])
+	return render_template('welcome.html', reg_scc_msg=reg_success_msg, out_scc_msg=out_success_msg)
+	
+@app.route('/admin_login', methods = ['GET']) #Admin login page template
 def login_admin():
 	return render_template('news_admin_index_login.html', warning_message = None)
 
-@app.route('/member_login', methods = ['GET'])
+@app.route('/member_login', methods = ['GET']) #Member login page template
 def login_member():
 	return render_template('news_index_login.html', warning_message = None)
     
-@app.route('/member_register', methods = ['GET'])
+@app.route('/member_register', methods = ['GET']) #Member register page template
 def register_member():
 	return render_template('news_index_register.html')
     
-@app.route('/news_feed', methods = ['GET'])
-#@login_required
+@app.route('/news_feed', methods = ['GET']) #News Feed Render to user
+@login_required
 def feed_load():
 	feed_response = requests.get('http://127.0.0.1:5000/getallnews')
 	return render_template('prod_table.html',table_fill = feed_response.json())
 #### Static html pages hosted ####
+#### Render Redirect ####
+@app.route('/redirect_feed', methods = ['GET'])
+@login_required
+def redirect_feed():
+	return redirect("/news_feed")
+	
+@app.route('/redirect_save_news', methods = ['GET'])
+@login_required
+def redirect_save():
+	return redirect("/save_news")
+#### Render Redirect ####
+
+#### Saving News ####
+
+@app.route('/save_news', methods = ['GET']) #Render saving page for user
+@login_required
+def load_save_news_GET():
+	server_response_fault = session.get('server_fault')
+	session.pop('server_fault', None)
+
+	server_response_success= session.get('server_success')
+	session.pop('server_success', None)
+	
+	options = []
+	username = ""
+	
+	if current_user.is_authenticated:
+		username = str(current_user.username)
+		headers = {'Content-Type': 'application/json'}
+		data_to_be_sent = {
+			'user' : username
+		}
+		response_populate = requests.post('http://127.0.0.1:5000/save_populate', json=data_to_be_sent, headers = headers)
+		if response_populate.status_code in [200,302]:
+			options = response_populate.json()
+		else:
+			session['server_fault'] = 'Request not successful!'
+	else:
+		logout_user()
+		session['logout_success'] = 'You are logged out!'
+		return redirect('/welcome')
+	
+	return render_template('save_news_OS.html', fault_response = server_response_fault, success_response = server_response_success, population_list = options, user = username)
+
+@app.route('/send_save_auth', methods = ['POST']) 
+@login_required
+def save_news_auth():
+	if current_user.is_authenticated:
+		auth_user = current_user.username
+		file_name_save = request.form['file_name']
+		headers = {'Content-Type': 'application/json'}
+		data_to_be_sent = {
+			'user' : str(auth_user),
+			'file_alias' : str(file_name_save)
+		}
+		response_save = requests.post('http://127.0.0.1:5000/rss_save_news', json=data_to_be_sent, headers = headers)
+		
+		#Handle Response
+		if response_save.status_code in [200,302]:
+			session['server_success'] = response_save.json()
+		else:
+			session['server_fault'] = 'Request not successful!'
+			
+		return redirect('/save_news') 
+		
+	else:
+		logout_user()
+		session['logout_success'] = 'You are logged out!'
+		return redirect('/welcome')
+#### Saving News ####
+
+#### Loading News ####
+@app.route('/load_news', methods = ['POST']) 
+@login_required
+def load_user_news():
+	if current_user.is_authenticated:
+		posted_json = request.get_json()
+		file_alias = posted_json["select_option"]
+		auth_user = current_user.username
+		
+		
+		headers = {'Content-Type': 'application/json'}
+		data_to_be_sent = {
+			'user' : str(auth_user),
+			'file_alias' : str(file_alias)
+		}
+		
+		response_load = requests.post(f'http://127.0.0.1:5000/loadnews', json=data_to_be_sent, headers = headers)
+		#Handle Response
+		if response_load.status_code in [200,302]:
+			return response_load.json()
+		else:
+			return jsonify({"error": f"Cannot find {response_load.text}"}), 404
+			
+	else:
+		logout_user()
+		session['logout_success'] = 'You are logged out!'
+		return redirect('/welcome')
+
+#### Loading News ####
 
 #### Login and Session Management APIs ####
 @login_manager.user_loader
 def load_user(user_id):
 	return User.query.get(int(user_id))
 
-@app.route('/member_login', methods = ['POST'])
+@app.route('/member_login', methods = ['POST']) #Logic of member login
 def login_member_post():
 	username = request.form['username']
 	password = request.form['password']
@@ -83,7 +189,7 @@ def login_member_post():
 		warning_message = 'Incorrect Credentials!'
 		return render_template('news_index_login.html',warning_message = warning_message)
 
-@app.route('/member_register', methods = ['POST'])
+@app.route('/member_register', methods = ['POST']) #Logic of member register
 def register_member_post():
 	username = request.form['username']
 	password = request.form['password']
@@ -115,7 +221,7 @@ def register_member_post():
 	return redirect('/welcome')
 	
 
-@app.route('/admin_login', methods = ['POST'])
+@app.route('/admin_login', methods = ['POST']) # Admin Login Logic
 def login_admin_post():
 	username = request.form['username']
 	password = request.form['password']
@@ -137,10 +243,11 @@ def login_admin_post():
 		warning_message = 'Incorrect Credentials!'
 		return render_template('news_admin_index_login.html',warning_message = warning_message)
 
-@app.route('/logout')
+@app.route('/logout', methods = ['GET']) #User logout logic
 @login_required
 def logout():
     logout_user()
-    return 'You are logged out.'
+    session['logout_success'] = 'You are logged out' 
+    return redirect('/welcome')
 #### Login and Session Management APIs ####
 
