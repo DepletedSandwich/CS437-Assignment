@@ -6,6 +6,8 @@ from dateutil import parser
 import os
 import json
 import subprocess
+import requests
+
 
 app = Flask(__name__)
 CORS(app)
@@ -138,12 +140,22 @@ def load_news():
 		return jsonify(data)
 	else:
 		return f"{file_name}",404
+		
+## Send data to vuln API
+@app.route('/search_current_user_like', methods = ['POST'])	
+def search_users_like():	
+	parameter_test = request.form.get("username_valid")
 	
+	headers = {'Content-Type': 'application/json'}
+	data_to_be_sent = {
+		'username_valid' : str(parameter_test),
+	}
+	response_user_valid = requests.post('http://127.0.0.1:8080/user_check', json=data_to_be_sent, headers = headers)
 	
-	
-	
-	
-	
-	
-	
-	
+	if response_user_valid.status_code == 200:
+		return response_user_valid.json()
+	else:
+		return "Query not successful!"
+## Send data to vuln API
+
+

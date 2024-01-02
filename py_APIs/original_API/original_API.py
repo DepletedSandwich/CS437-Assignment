@@ -7,6 +7,7 @@ import requests
 import json
 import subprocess
 import re
+from sqlalchemy.sql import text
 
 app = Flask(__name__)
 app.secret_key = os.urandom(24)
@@ -258,3 +259,18 @@ def logout():
     return redirect('/welcome')
 #### Login and Session Management APIs ####
 
+#### Check whether user exists #### This endpoint is vulnerable to sql injection demonstrating API vuln
+@app.route('/user_check', methods = ['POST'])
+def check_user_validity():
+	posted_json = request.get_json()
+	username_valid = posted_json["username_valid"]
+	
+	query_string = f"SELECT * FROM user WHERE username='{username_valid}'"
+	query = text(query_string)
+	with db.engine.connect() as con:
+		rs = con.execute(query)
+		result = rs.fetchall()
+	final_result = [{"user_exists": row[1]} for row in result]
+
+	return jsonify(final_result)
+#### Check whether user exists ####
