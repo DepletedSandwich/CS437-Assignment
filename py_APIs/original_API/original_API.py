@@ -6,11 +6,12 @@ import os
 import requests
 import json
 import subprocess
+import re
 
 app = Flask(__name__)
 app.secret_key = os.urandom(24)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///user_info.db'
-CORS(app)
+CORS(app, supports_credentials=True)
 db = SQLAlchemy(app)
 login_manager = LoginManager()
 login_manager.init_app(app)
@@ -210,7 +211,13 @@ def register_member_post():
 	if existing_email:
 		warning_message = 'Email not valid!'
 		return render_template('news_index_register.html', warning_message=warning_message)
-
+	
+	#Check Username validity
+	if not re.match(r'^[a-zA-Z0-9_-]+$', username):
+		warning_message = 'Username contains invalid characters!'
+		return render_template('news_index_register.html', warning_message=warning_message)
+	
+	
 	# Create a new User instance and add it to the database
 	new_user = User(username=username, password=password, email=email)
 	db.session.add(new_user)
