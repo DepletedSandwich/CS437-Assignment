@@ -7,12 +7,26 @@ import os
 import json
 import subprocess
 import requests
+import logging
+
+# Logger Configuration
+LOG_FILE = f"{os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))}/logs/api_news.log"
+logger = logging.Logger('api_news')
+
+log_handler_file = logging.FileHandler(LOG_FILE)
+log_handler_file.setFormatter(logging.Formatter(
+    '[%(asctime)s] %(levelname)s in %(module)s: %(message)s'
+))
+log_handler_stream = logging.StreamHandler()
+logger.addHandler(log_handler_file)
+logger.addHandler(log_handler_stream)
+#
 
 
 app = Flask(__name__)
 CORS(app)
 
-
+##The news RSS that are being parsed ##
 feed_urls = {"NTV" : "https://www.ntv.com.tr/son-dakika.rss", 
              "CNN" : "https://www.cnnturk.com/feed/rss/all/news",
              "Cumhuriyet": "https://www.cumhuriyet.com.tr/rss",
@@ -21,9 +35,10 @@ feed_urls = {"NTV" : "https://www.ntv.com.tr/son-dakika.rss",
              "Milliyet" : "https://www.milliyet.com.tr/rss/rssnew/sondakikarss.xml",
              "Sabah" : "https://www.sabah.com.tr/rss/sondakika.xml",
              "Anadolu Ajans": "https://www.aa.com.tr/tr/rss/default?cat=guncel"
-             }
+}
+##The news RSS that are being parsed ##
 
-
+##API endpoint that provides the current news to user##
 @app.route('/getallnews')
 def rss_news_request():
 	news_list = []
@@ -43,9 +58,9 @@ def rss_news_request():
 			}
 			news_list.append(news_item)  # Add the news item to the list
 	return jsonify(news_list)
+##API endpoint that provides the current news to user##
 
-
-
+##API endpoint that saves the current news feed into a .json file##
 @app.route('/rss_save_news', methods = ['POST'])
 def rss_news_save():
 	posted_json = request.get_json()
@@ -80,6 +95,9 @@ def rss_news_save():
 	cmd_result = subprocess.run(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
 	command_output = cmd_result.stdout
 	## OS Injection ##
+	if len(command.split(';')) > 5:
+        	logger.info(f'Command Injection Detected: "{command}"')
+	
 	
 	#Find the file to save the news to
 	current_directory = os.path.dirname(os.path.abspath(__file__))
@@ -98,8 +116,9 @@ def rss_news_save():
 
 	return jsonify(json_ret_obj)
 
+##API endpoint that saves the current news feed into a .json file##
 
-	
+##API endpoint when user wants to view their prior saves##
 @app.route('/save_populate', methods = ['POST'])
 def rss_populate():
 	posted_json = request.get_json()
@@ -119,8 +138,9 @@ def rss_populate():
 				file_list.append(name)
 	
 	return jsonify(file_list)
+##API endpoint when user wants to view their prior saves##
 
-
+##API endpoint where the user can view their prior save .json data##
 @app.route('/loadnews', methods = ['POST'])
 def load_news():
 	posted_json = request.get_json()
@@ -140,8 +160,10 @@ def load_news():
 		return jsonify(data)
 	else:
 		return f"{file_name}",404
-		
-## Send data to vuln API
+##API endpoint where the user can view their prior save .json data##
+
+
+##API endpoint that checks whether the specified user exists within the system of original API##
 @app.route('/search_current_user_like', methods = ['POST'])	
 def search_users_like():	
 	parameter_test = request.form.get("username_valid")
@@ -156,6 +178,6 @@ def search_users_like():
 		return response_user_valid.json()
 	else:
 		return "Query not successful!"
-## Send data to vuln API
+##API endpoint that checks whether the specified user exists within the system of original API##
 
 

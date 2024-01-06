@@ -2,12 +2,27 @@ from flask import Flask, jsonify, request, redirect, url_for, session, render_te
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
+from sqlalchemy.sql import text
 import os
 import requests
 import json
 import subprocess
 import re
-from sqlalchemy.sql import text
+import logging
+
+## Logger Configuration
+LOG_FILE = f"{os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))}/logs/api_news.log"
+logger = logging.Logger('api_original')
+
+log_handler_file = logging.FileHandler(LOG_FILE)
+log_handler_stream = logging.StreamHandler()
+log_handler_file.setFormatter(logging.Formatter(
+    '[%(asctime)s] %(levelname)s in %(module)s: %(message)s'
+))
+logger.addHandler(log_handler_stream)
+logger.addHandler(log_handler_file)
+##
+
 
 app = Flask(__name__)
 app.secret_key = os.urandom(24)
@@ -17,7 +32,7 @@ db = SQLAlchemy(app)
 login_manager = LoginManager()
 login_manager.init_app(app)
 
-#### User Table Template ####
+#### Database Tables Template ####
 class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
@@ -29,8 +44,7 @@ class Admin(UserMixin, db.Model):
     username = db.Column(db.String(80), unique=True, nullable=False)
     password = db.Column(db.String(60), nullable=False)
     email = db.Column(db.String(70), nullable=False)
-
-#### User Table Template ####
+#### Database Tables Template ####
 
 #### Static html pages hosted ####
 @app.route('/welcome', methods = ['GET'])
@@ -63,6 +77,7 @@ def feed_load():
 	feed_response = requests.get('http://127.0.0.1:5000/getallnews')
 	return render_template('prod_table.html',table_fill = feed_response.json())
 #### Static html pages hosted ####
+
 #### Render Redirect ####
 @app.route('/redirect_feed', methods = ['GET'])
 @login_required
@@ -107,7 +122,7 @@ def load_save_news_GET():
 	
 	return render_template('save_news_OS.html', fault_response = server_response_fault, success_response = server_response_success, population_list = options, user = username)
 
-@app.route('/send_save_auth', methods = ['POST']) 
+@app.route('/send_save_auth', methods = ['POST']) #Save the current news for user
 @login_required
 def save_news_auth():
 	if current_user.is_authenticated:
@@ -135,7 +150,7 @@ def save_news_auth():
 #### Saving News ####
 
 #### Loading News ####
-@app.route('/load_news', methods = ['POST']) 
+@app.route('/load_news', methods = ['POST']) #Load prior .json file that contains user save
 @login_required
 def load_user_news():
 	if current_user.is_authenticated:
@@ -259,13 +274,17 @@ def logout():
     return redirect('/welcome')
 #### Login and Session Management APIs ####
 
-#### Check whether user exists #### This endpoint is vulnerable to sql injection demonstrating API vuln
+#### Check whether user exists ####
 @app.route('/user_check', methods = ['POST'])
 def check_user_validity():
 	posted_json = request.get_json()
 	username_valid = posted_json["username_valid"]
+	query_string = f"SELECT * FROM user WHERE username='{username_valid}'" #Vulnerable to SQL injection if the input is not sanitized
 	
-	query_string = f"SELECT * FROM user WHERE username='{username_valid}'"
+	patterns = [r'or\s+\d+=\d+', r'union\s+select', r'select\s+@@version', r'--', r'/\*.*\*/']
+	for pattern in patterns:
+		if re.search(pattern, query_string, re.IGNORECASE):
+			logger.info(f'Hostile Injection Detected: "{username_valid}"')
 	query = text(query_string)
 	with db.engine.connect() as con:
 		rs = con.execute(query)
